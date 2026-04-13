@@ -1,0 +1,1 @@
+# Friday modules package

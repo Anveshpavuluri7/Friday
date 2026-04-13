@@ -1,0 +1,16 @@
+openai-whisper
+sounddevice
+pyaudio
+librosa
+numpy
+webrtcvad-wheels
+openwakeword
+requests
+pyttsx3
+PyYAML
+selenium
+pywin32
+pyautogui
+PyQt5
+plyer
+psutil

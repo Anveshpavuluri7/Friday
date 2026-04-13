@@ -1,0 +1,52 @@
+routines:
+
+  clap_trigger:
+    trigger: double_clap
+    steps:
+      - action: speak
+        text: "Double clap detected. Launching your setup, Boss."
+      - action: launch_app
+        app: spotify
+      - action: wait
+        seconds: 2
+      - action: open_url
+        url: https://claude.ai
+        browser: brave
+      - action: wait
+        seconds: 1
+      - action: open_url
+        url: https://mail.google.com
+        browser: brave
+      - action: speak
+        text: "Spotify, Claude, and Gmail are ready. Good to go."
+
+  morning_routine:
+    trigger: voice
+    steps:
+      - action: speak
+        text: "Good morning, Boss. Starting your morning setup."
+      - action: set_volume
+        level: 50
+      - action: launch_app
+        app: spotify
+      - action: open_url
+        url: https://mail.google.com
+        browser: brave
+      - action: open_url
+        url: https://calendar.google.com
+        browser: brave
+      - action: speak
+        text: "Morning routine complete. Have a productive day."
+
+  night_routine:
+    trigger: voice
+    steps:
+      - action: speak
+        text: "Shutting things down, Boss."
+      - action: close_app
+        app: spotify
+      - action: set_volume
+        level: 20
+      - action: notify
+        title: "Friday"
+        message: "Workspace closed. Good night."

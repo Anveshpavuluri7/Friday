@@ -1,0 +1,44 @@
+friday:
+  name: Friday
+  user_name: Boss
+  startup_sound: assets/sounds/boot.wav
+  language: en
+
+llm:
+  provider: ollama
+  model: phi3
+  base_url: http://localhost:11434
+  max_history_turns: 10
+  temperature: 0.7
+
+stt:
+  model: base
+  language: en
+  device: cpu
+
+tts:
+  provider: pyttsx3
+  rate: 175
+  volume: 0.9
+  voice_index: 0
+
+wake_word:
+  model: hey_jarvis
+  sensitivity: 0.5
+
+clap:
+  threshold: 0.35
+  window_ms: 800
+  cooldown_s: 3
+
+browser:
+  default: brave
+  brave_exe: "C:/Program Files/BraveSoftware/Brave-Browser/Application/brave.exe"
+  chromedriver: "drivers/chromedriver.exe"
+
+apps:
+  spotify: "C:/Users/91630/AppData/Local/Microsoft/WindowsApps/Spotify.exe"
+  brave: "C:/Program Files/BraveSoftware/Brave-Browser/Application/brave.exe"
+  vscode: "C:/Users/91630/AppData/Local/Programs/Microsoft VS Code/Code.exe"
+  notepad: "C:/Windows/System32/notepad.exe"
+  claude_url: "https://claude.ai"
