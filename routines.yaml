@@ -9,9 +9,8 @@ routines:
         app: spotify
       - action: wait
         seconds: 2
-      - action: open_url
-        url: https://claude.ai
-        browser: brave
+      - action: launch_app
+        app: claude
       - action: wait
         seconds: 1
       - action: open_url

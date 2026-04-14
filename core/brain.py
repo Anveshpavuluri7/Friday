@@ -128,8 +128,11 @@ class Brain:
             "model": self.model,
             "messages": messages,
             "stream": False,
+            "keep_alive": "1h",
             "options": {
                 "temperature": self.temperature,
+                "num_ctx": 1024,
+                "num_predict": 100,
             },
         }
 

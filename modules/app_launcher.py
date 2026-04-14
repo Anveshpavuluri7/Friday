@@ -77,42 +77,51 @@ class AppLauncher:
 
     def launch(self, app_name: str) -> str:
         """
-        Launch an application by name.
-
-        If the app is already running, attempts to focus its window instead.
-
-        Args:
-            app_name: Key from the apps section in config.yaml
-                      (e.g., 'spotify', 'brave', 'notepad')
-
-        Returns:
-            Result message string.
+        Launch an application dynamically by searching installed apps, then config fallback.
         """
         app_name_lower = app_name.lower().strip()
 
-        # Look up the app path in config
-        app_path = self.apps.get(app_name_lower)
+        # 1. Search Windows installed apps dynamically via PowerShell
+        try:
+            cmd = f"Get-StartApps | Where-Object Name -match '{app_name_lower}' | Select-Object -ExpandProperty AppID -First 1"
+            result = subprocess.run(
+                ["powershell", "-Command", cmd], 
+                capture_output=True, 
+                text=True, 
+                creationflags=0x08000000
+            )
+            app_id = result.stdout.strip()
+            if app_id:
+                # Check if it's already running (fuzzy match focus)
+                if self._is_running(app_name_lower):
+                    if self._focus_window(app_name_lower):
+                        return f"{app_name} is already running — brought to focus."
+                
+                # Launch it
+                subprocess.Popen(
+                    f"explorer.exe shell:AppsFolder\\{app_id}",
+                    shell=True,
+                    stdout=subprocess.DEVNULL,
+                    stderr=subprocess.DEVNULL,
+                )
+                return f"Launched {app_name} dynamically."
+        except Exception as e:
+            print(f"[AppLauncher] Dynamic Powershell search error: {e}")
 
+        # 2. Config dictionary fallback
+        app_path = self.apps.get(app_name_lower)
         if not app_path:
-            # Try a fuzzy match
             for key, path in self.apps.items():
                 if app_name_lower in key.lower():
                     app_path = path
                     app_name_lower = key
                     break
 
-        if not app_path:
-            return f"App '{app_name}' not found in config. Available: {', '.join(self.apps.keys())}"
+        # If it's a known URL or doesn't exist, signal not found
+        if not app_path or app_path.startswith("http://") or app_path.startswith("https://") or not os.path.exists(app_path):
+            return "APP_NOT_FOUND"
 
-        # Check if it's a URL (like claude_url)
-        if app_path.startswith("http://") or app_path.startswith("https://"):
-            return f"'{app_name}' is a URL ({app_path}), use open_url action instead."
-
-        # Check if the exe exists
-        if not os.path.exists(app_path):
-            return f"App executable not found: {app_path}"
-
-        # Check if already running — try to focus instead
+        # Check if already running again just for config path exe_name
         exe_name = os.path.basename(app_path)
         if self._is_running(exe_name):
             if self._focus_window(app_name_lower):
@@ -120,17 +129,10 @@ class AppLauncher:
             else:
                 return f"{app_name} is already running."
 
-        # Launch the app
+        # Launch the app from config
         try:
-            subprocess.Popen(
-                [app_path],
-                shell=False,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-            )
+            subprocess.Popen([app_path], shell=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
             return f"Launched {app_name}."
-        except FileNotFoundError:
-            return f"Could not find: {app_path}"
         except Exception as e:
             return f"Error launching {app_name}: {e}"
 

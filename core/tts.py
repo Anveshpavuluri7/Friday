@@ -1,20 +1,21 @@
 """
 core/tts.py — Text-to-Speech using pyttsx3 (offline, Windows SAPI).
 
-Initializes a pyttsx3 engine with configurable rate, volume, and voice.
-Speaks text aloud using the system's built-in speech synthesis.
+Initializes a pyttsx3 engine in a dedicated background thread to safely
+handle speech from multiple threads without COM threading errors.
 """
 
 import yaml
 import os
 import sys
-
+import threading
+import queue
 
 class TextToSpeech:
     """Speaks text aloud using pyttsx3 (Windows SAPI voices)."""
 
     def __init__(self, config_path="config.yaml"):
-        """Load config and initialize the TTS engine."""
+        """Load config and initialize the TTS worker thread."""
         # Load config
         config_file = config_path
         if not os.path.isabs(config_path):
@@ -31,10 +32,14 @@ class TextToSpeech:
         self.volume = tts_config.get("volume", 0.9)
         self.voice_index = tts_config.get("voice_index", 0)
 
-        # Initialize pyttsx3 engine
+        self.tts_queue = queue.Queue()
+        self.worker = threading.Thread(target=self._tts_worker, daemon=True)
+        self.worker.start()
+
+    def _tts_worker(self):
+        """Dedicated thread to run pyttsx3 (fixes COM concurrency issues)."""
         try:
             import pyttsx3
-
             self.engine = pyttsx3.init()
         except Exception as e:
             print(f"[TTS] ERROR: Failed to initialize TTS engine: {e}")
@@ -57,12 +62,24 @@ class TextToSpeech:
             if self.voice_index < len(voices):
                 self.engine.setProperty("voice", voices[self.voice_index].id)
             else:
-                print(f"[TTS] WARNING: voice_index {self.voice_index} out of range, using default.")
                 self.engine.setProperty("voice", voices[0].id)
-        else:
-            print("[TTS] WARNING: No voices found on this system.")
-
+        
         print(f"[TTS] Engine ready — rate: {self.rate}, volume: {self.volume}")
+
+        while True:
+            item = self.tts_queue.get()
+            if item is None:
+                break
+            
+            text, event = item
+            if self.engine:
+                try:
+                    self.engine.say(text)
+                    self.engine.runAndWait()
+                except Exception as e:
+                    print(f"[TTS] ERROR during speech: {e}")
+            
+            event.set()
 
     def speak(self, text: str):
         """
@@ -73,13 +90,7 @@ class TextToSpeech:
         """
         if not text or not text.strip():
             return
-
-        if self.engine is None:
-            print(f"[TTS] (engine unavailable) Would say: {text}")
-            return
-
-        try:
-            self.engine.say(text)
-            self.engine.runAndWait()
-        except Exception as e:
-            print(f"[TTS] ERROR during speech: {e}")
+            
+        evt = threading.Event()
+        self.tts_queue.put((text, evt))
+        evt.wait()

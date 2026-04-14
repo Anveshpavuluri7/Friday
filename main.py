@@ -1,5 +1,5 @@
 """
-main.py — Friday Phase 3
+main.py — Friday Phase 5
 
 Loop: listen → transcribe → quick-command check → LLM brain → dispatch → speak.
 Simple commands (open/close apps, open URLs) are handled instantly without
@@ -81,26 +81,25 @@ def try_quick_command(text: str, config: dict, dispatcher: Dispatcher, tts) -> b
     match = re.search(r"(?:open|launch|start|run)\s+(\w+)", text_lower)
     if match:
         app_name = match.group(1).lower()
-        # Check if it's a known app
-        if app_name in apps:
-            app_path = apps[app_name]
-            # If it's a URL entry (like claude_url), open in browser
-            if app_path.startswith("http"):
-                tts.speak(f"Opening {app_name} in the browser, Boss.")
-                result = dispatcher.browser_control.open_url(app_path)
-                print(f"    → {result}")
-                return True
-            else:
-                tts.speak(f"Opening {app_name} now, Boss.")
-                result = dispatcher.app_launcher.launch(app_name)
-                print(f"    → {result}")
-                return True
-        # Check if it's a known URL alias
-        elif app_name in KNOWN_URLS:
-            tts.speak(f"Opening {app_name} for you, Boss.")
-            result = dispatcher.browser_control.open_url(KNOWN_URLS[app_name])
+        
+        # Try dynamic app launch natively first
+        result = dispatcher.app_launcher.launch(app_name)
+        if result != "APP_NOT_FOUND":
+            tts.speak(f"Opening {app_name} now, Boss.")
             print(f"    → {result}")
             return True
+            
+        # It's not an installed/findable Windows app. Fall back to known aliases or web
+        if app_name in KNOWN_URLS:
+            url = KNOWN_URLS[app_name]
+            tts.speak(f"Opening {app_name} for you, Boss.")
+        else:
+            url = f"https://{app_name}.com"
+            tts.speak(f"I couldn't find {app_name} installed, opening the web instead, Boss.")
+            
+        result = dispatcher.browser_control.open_url(url)
+        print(f"    → {result}")
+        return True
 
     # --- Check: Close an app ---
     match = re.search(r"(?:close|quit|exit|stop|kill)\s+(\w+)", text_lower)
@@ -131,14 +130,33 @@ def try_quick_command(text: str, config: dict, dispatcher: Dispatcher, tts) -> b
         print(f"    → {result}")
         return True
 
+    # --- Check: Shutdown System ---
+    match = re.search(r"(?:bye\s*bye|close\s*friday|stop\s*friday|shut\s*down)", text_lower)
+    if match:
+        tts.speak("Goodbye, Boss. Shutting down system natively.")
+        import sys, os
+        from PyQt5.QtWidgets import QApplication
+        if QApplication.instance():
+            QApplication.quit()
+        os._exit(0)
+        return True
+
     # No quick command matched — will go to LLM
     return False
 
 
-def main():
-    """Phase 3 loop: listen → transcribe → quick-cmd or LLM → speak."""
+def main(status_callback=None):
+    """Phase 6 loop: wake-word → listen → transcribe → quick-cmd or LLM → speak."""
+    
+    def update_ui(msg):
+        """Passes statuses efficiently directly to the PyQt5 overlay HUD if it's running."""
+        print(f"[UI] {msg}")
+        if status_callback:
+            status_callback(msg)
+
+    update_ui("Booting Core Modules...")
     print("=" * 50)
-    print("  FRIDAY — Phase 3: App & Browser Control")
+    print("  FRIDAY — Phase 6: UI HUD & Notifications")
     print("=" * 50)
     print()
 
@@ -162,26 +180,41 @@ def main():
     dispatcher = Dispatcher()
     dispatcher.set_tts(tts)
 
-    print()
+    print("[main] Initializing clap detector...")
+    from gestures.clap_detector import ClapDetector
+    clap_detector = ClapDetector(dispatcher=dispatcher)
+    clap_detector.start()
+
+    print("[main] Initializing wake word detector...")
+    from core.wake_word import WakeWordDetector
+    wake_word_detector = WakeWordDetector()
+
+    update_ui("Components Initialized.")
     print("=" * 50)
-    print("  Friday Phase 3 online")
+    print("  Friday Phase 6 online")
     print(f"  Ready to listen, {user_name}.")
-    print("  Try: 'Open Spotify' or 'Open Gmail'")
+    print("  Try: 'Open Spotify' or 'Run morning routine'")
     print("  Press Ctrl+C to exit.")
     print("=" * 50)
     print()
 
-    tts.speak(f"Friday Phase 3 online. Ready, {user_name}.")
+    tts.speak(f"Friday Phase 6 online. Ready, {user_name}.")
     time.sleep(0.5)
 
     try:
         while True:
+            # Step 0: Wait for Wake Word
+            update_ui("Passive (Wake Word)")
+            wake_word_detector.wait_for_wake_word()
+
             # Step 1: Listen
+            update_ui("Listening to you...")
             audio = listener.listen()
             if audio is None or len(audio) == 0:
                 continue
 
             # Step 2: Transcribe
+            update_ui("Transcribing audio...")
             print("[main] Transcribing...")
             text = stt.transcribe(audio)
             if not text:
@@ -191,17 +224,20 @@ def main():
             print(f"\n>>> You: \"{text}\"\n")
 
             # Step 3: Try quick command first (instant, no LLM needed)
+            update_ui("Processing command...")
             if try_quick_command(text, config, dispatcher, tts):
                 print("[main] Handled via quick command.\n")
                 time.sleep(0.5)
                 continue
 
             # Step 4: Not a quick command → send to LLM brain
+            update_ui(f"Thinking: '{text}'...")
             print("[main] Sending to brain...")
             response = brain.think(text)
             print(f">>> Friday: {response}\n")
 
             # Step 5: Execute any [ACTION:] tags
+            update_ui("Executing Instructions...")
             results = dispatcher.dispatch(response)
             if results:
                 for r in results:
@@ -210,16 +246,24 @@ def main():
             # Step 6: Speak the clean response
             spoken_text = Brain.strip_action_tags(response)
             if spoken_text:
+                update_ui("Speaking...")
                 tts.speak(spoken_text)
                 time.sleep(0.5)
 
     except KeyboardInterrupt:
         print("\n")
         print("[main] Shutting down...")
+        clap_detector.stop()
         tts.speak(f"Goodbye, {user_name}.")
         print("[main] Friday offline. Goodbye.")
         sys.exit(0)
 
 
 if __name__ == "__main__":
-    main()
+    # If the user explicitly asks for CLI explicitly, launch normally.
+    # Otherwise hook into and seamlessly launch the new GUI HUD Window.
+    if "--cli" in sys.argv:
+        main()
+    else:
+        from ui.hud import launch_hud
+        launch_hud()

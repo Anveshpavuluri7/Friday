@@ -163,7 +163,21 @@ class Dispatcher:
 
         if action_type == 'launch_app':
             app_name = action.get('app', '')
-            return self.app_launcher.launch(app_name)
+            result = self.app_launcher.launch(app_name)
+            
+            # Fallback to web if APP_NOT_FOUND
+            if result == "APP_NOT_FOUND":
+                print(f"[Dispatcher] '{app_name}' not found installed natively, attempting web fallback.")
+                known_urls = {
+                    'claude': 'https://claude.ai',
+                    'gmail': 'https://mail.google.com',
+                    'youtube': 'https://youtube.com',
+                    'calendar': 'https://calendar.google.com'
+                }
+                url = known_urls.get(app_name.lower(), f"https://{app_name}.com")
+                return self.browser_control.open_url(url, "brave")
+            
+            return result
 
         elif action_type == 'close_app':
             app_name = action.get('app', '')
@@ -203,14 +217,10 @@ class Dispatcher:
         elif action_type == 'notify':
             title = action.get('title', 'Friday')
             message = action.get('message', '')
-            # Use plyer for notifications (Phase 6), fallback to print
-            try:
-                from plyer import notification
-                notification.notify(title=title, message=message, timeout=5)
-                return f"Notification sent: {title} — {message}"
-            except Exception:
-                print(f"[Notification] {title}: {message}")
-                return f"Notification (console): {title} — {message}"
+            
+            # Phase 6: Route securely through our dedicated Notifier UI module
+            from ui.notifier import Notifier
+            return Notifier.send(title, message)
 
         elif action_type == 'speak':
             text = action.get('text', '')
