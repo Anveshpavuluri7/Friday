@@ -11,7 +11,7 @@ A **JARVIS-inspired, offline web & system integration AI Assistant** designed to
 
 ## 📺 Demo
 
-[Friday AI Demo](https://drive.google.com/file/d/19orM2MOdW4ts1FcqLH55TzxLB2V6_sz8/view?usp=sharing)
+[Friday AI Demo](https://drive.google.com/file/d/1yevDSB6iEzo3TEbFzRoIMd4KKLCoa4Cj/view?usp=sharing)
 
 
 ---
